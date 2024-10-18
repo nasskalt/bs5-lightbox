@@ -5,14 +5,15 @@
  * @module bs5-lightbox
  */
 
-import { Modal, Carousel } from 'bootstrap';
+import { Carousel, Modal } from 'bootstrap';
+
 const bootstrap = {
 	Modal,
 	Carousel
 };
+
 class Lightbox {
 	constructor(el, options = {}) {
-		this.hash = this.randomHash();
 		this.settings = Object.assign(Object.assign(Object.assign({}, bootstrap.Modal.Default), bootstrap.Carousel.Default), {
 			interval: false,
 			target: '[data-toggle="lightbox"]',
@@ -23,42 +24,47 @@ class Lightbox {
 		this.settings = Object.assign(Object.assign({}, this.settings), options);
 		this.modalOptions = (() => this.setOptionsFromSettings(bootstrap.Modal.Default))();
 		this.carouselOptions = (() => this.setOptionsFromSettings(bootstrap.Carousel.Default))();
+
 		if (typeof el === 'string') {
 			this.settings.target = el;
 			el = document.querySelector(this.settings.target);
 		}
 		this.el = el;
 		this.type = el.dataset.type || '';
-
 		this.src = this.getSrc(el);
 		this.sources = this.getGalleryItems();
+		this.hash = this.randomHash();
+
 		this.createCarousel();
 		this.createModal();
 	}
+
 	show() {
 		document.body.appendChild(this.modalElement);
 		this.modal.show();
 	}
+
 	hide() {
 		this.modal.hide();
 	}
+
 	setOptionsFromSettings(obj) {
 		return Object.keys(obj).reduce((p, c) => Object.assign(p, { [c]: this.settings[c] }), {});
 	}
+
 	getSrc(el) {
-		let src = el.dataset.src || el.dataset.remote || el.href || 'http://via.placeholder.com/1600x900';
+		// 'https://via.placeholder.com/1600x900'; # deactivated due to data protection regulations
+		let src = el.dataset.src || el.dataset.remote || el.href;
 		if (el.dataset.type === 'html') {
 			return src;
 		}
 		if (!/\:\/\//.test(src)) {
 			src = window.location.origin + src;
 		}
-		const url = new URL(src);
-		if (el.dataset.footer || el.dataset.caption) {
-			url.searchParams.set('caption', el.dataset.footer || el.dataset.caption);
-		}
-		return url.toString();
+
+		return new URL(src).toString();
 	}
+
 	getGalleryItems() {
 		let galleryTarget;
 		if (this.settings.gallery) {
@@ -69,90 +75,90 @@ class Lightbox {
 		} else if (this.el.dataset.gallery) {
 			galleryTarget = this.el.dataset.gallery;
 		}
-		const gallery = galleryTarget
+		return galleryTarget
 			? [...new Set(Array.from(document.querySelectorAll(`[data-gallery="${galleryTarget}"]`), (v) => `${v.dataset.type ? v.dataset.type : ''}${this.getSrc(v)}`))]
 			: [`${this.type ? this.type : ''}${this.src}`];
-		return gallery;
 	}
-	getYoutubeId(src) {
-		if (!src) return false;
-		const matches = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
-		return matches && matches[2].length === 11 ? matches[2] : false;
-	}
+
 	getYoutubeLink(src) {
-		const youtubeId = this.getYoutubeId(src);
-		if (!youtubeId) {
+		if (!src) {
+			return false;
+		}
+		const matches = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+
+		if (!matches && matches[2].length !== 11) {
 			return false;
 		}
 
+		const youtubeId = matches[2];
 		const arr = src.split('?');
 		let params = arr.length > 1 ? '?' + arr[1] : '';
-		
+
 		return `https://www.youtube.com/embed/${youtubeId}${params}`;
 	}
+
 	getInstagramEmbed(src) {
 		if (/instagram/.test(src)) {
 			src += /\/embed$/.test(src) ? '' : '/embed';
 			return `<iframe src="${src}" class="start-50 translate-middle-x" style="max-width: 500px" frameborder="0" scrolling="no" allowtransparency="true"></iframe>`;
 		}
 	}
+
 	isEmbed(src) {
 		const regex = new RegExp('(' + Lightbox.allowedEmbedTypes.join('|') + ')');
-		const isEmbed = regex.test(src);
-		const isImg = /\.(png|jpe?g|gif|svg|webp)/i.test(src) || this.el.dataset.type === 'image';
-
-		return isEmbed || !isImg;
+		return regex.test(src);
 	}
+
+	getFileExtension(src) {
+		return src.split('.').pop().split('?')[0].toLowerCase();
+	}
+
+	isImage(src) {
+		const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
+		const extension = this.getFileExtension(src);
+		return imageExtensions.includes(extension);
+	}
+
+	isVideo(src) {
+		const videoExtensions = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+		const extension = this.getFileExtension(src);
+		return videoExtensions.includes(extension);
+	}
+
 	createCarousel() {
 		const template = document.createElement('template');
-		const types = Lightbox.allowedMediaTypes.join('|');
 		const slidesHtml = this.sources
 			.map((src, i) => {
 				src = src.replace(/\/$/, '');
-				const regex = new RegExp(`^(${types})`, 'i');
-				const isHtml = /^html/.test(src);
-				const isForcedImage = /^image/.test(src);
 
-				if (regex.test(src)) {
-					src = src.replace(regex, '');
-				}
 				const imgClasses = this.settings.constrain ? 'mw-100 mh-100 h-auto w-auto m-auto top-0 end-0 bottom-0 start-0' : 'h-100 w-100';
-				const params = new URLSearchParams(src.split('?')[1]);
-				let caption = '';
-				let url = src;
-				if (params.get('caption')) {
-					try {
-						url = new URL(src);
-						url.searchParams.delete('caption');
-						url = url.toString();
-					} catch (e) {
-						url = src;
-					}
-					caption = `<p class="lightbox-caption m-0 p-2 text-center text-white small"><em>${params.get('caption')}</em></p>`;
-				}
-				let inner = `<img src="${url}" class="d-block ${imgClasses} img-fluid" style="z-index: 1; object-fit: contain;" />`;
+				let inner = `<img src="${src}" class="d-block ${imgClasses} img-fluid" style="z-index: 1; object-fit: contain;" />`;
 				let attributes = '';
-				const instagramEmbed = this.getInstagramEmbed(src);
-				const youtubeLink = this.getYoutubeLink(src);
-				if (this.isEmbed(src) && !isForcedImage) {
+
+				if (this.isEmbed(src)) {
+					const instagramEmbed = this.getInstagramEmbed(src);
+					const youtubeLink = this.getYoutubeLink(src);
+
 					if (youtubeLink) {
 						src = youtubeLink;
 						attributes = 'title="YouTube video player" frameborder="0" allow="accelerometer autoplay clipboard-write encrypted-media gyroscope picture-in-picture"';
 					}
 					inner = instagramEmbed || `<iframe src="${src}" ${attributes} allowfullscreen></iframe>`;
 				}
-				if (isHtml) {
-					inner = src;
+				if (this.isVideo(src)) {
+					inner = `<video controls autoplay>
+                        <source src="${src}" type="video/${this.getFileExtension(src)}"/>
+                        <p>Your browser doesn't support HTML video.</p>
+                    </video>`;
 				}
-				const spinner = `<div class="position-absolute top-50 start-50 translate-middle text-white"><div class="spinner-border" style="width: 3rem height: 3rem" role="status"></div></div>`;
-				return `
-				<div class="carousel-item ${!i ? 'active' : ''}" style="min-height: 100px">
-					${spinner}
+
+				return `<div class="carousel-item ${!i ? 'active' : ''}" style="min-height: 100px">
+					<div class="position-absolute top-50 start-50 translate-middle text-white"><div class="spinner-border" style="width: 3rem height: 3rem" role="status"></div></div>
 					<div class="ratio ratio-16x9" style="background-color: #000;">${inner}</div>
-					${caption}
 				</div>`;
 			})
 			.join('');
+
 		const controlsHtml =
 			this.sources.length < 2
 				? ''
@@ -165,6 +171,7 @@ class Lightbox {
 				<span class="carousel-control-next-icon" aria-hidden="true"></span>
 				<span class="visually-hidden">Next</span>
 			</button>`;
+
 		let classes = 'lightbox-carousel carousel slide';
 		if (this.settings.size === 'fullscreen') {
 			classes += ' position-absolute w-100 translate-middle top-50 start-50';
@@ -202,6 +209,7 @@ class Lightbox {
 		}
 		return this.carousel;
 	}
+
 	findGalleryItemIndex(haystack, needle) {
 		let index = 0;
 		for (const item of haystack) {
@@ -212,6 +220,7 @@ class Lightbox {
 		}
 		return 0;
 	}
+
 	createModal() {
 		const template = document.createElement('template');
 		const btnInner =
@@ -234,10 +243,12 @@ class Lightbox {
 		this.modal = new bootstrap.Modal(this.modalElement, this.modalOptions);
 		return this.modal;
 	}
+
 	randomHash(length = 8) {
 		return Array.from({ length }, () => Math.floor(Math.random() * 36).toString(36)).join('');
 	}
 }
+
 Lightbox.allowedEmbedTypes = ['embed', 'youtube', 'vimeo', 'instagram', 'url'];
 Lightbox.allowedMediaTypes = [...Lightbox.allowedEmbedTypes, 'image', 'html'];
 Lightbox.defaultSelector = '[data-toggle="lightbox"]';
@@ -247,7 +258,9 @@ Lightbox.initialize = function (e) {
 	lightbox.show();
 };
 document.querySelectorAll(Lightbox.defaultSelector).forEach((el) => el.addEventListener('click', Lightbox.initialize));
+
 if (typeof window !== 'undefined' && window.bootstrap) {
 	window.bootstrap.Lightbox = Lightbox;
 }
+
 export default Lightbox;

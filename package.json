@@ -6,10 +6,10 @@
     "email": "travis@travisaw.com"
   },
   "bugs": {
-    "url": "https://github.com/trvswgnr/bs5-lightbox/issues"
+    "url": "https://github.com/nasskalt/bs5-lightbox/issues"
   },
   "description": "A pure JS lightbox gallery plugin for Bootstrap 5 based on the modal and carousel plugins",
-  "homepage": "https://github.com/trvswgnr/bs5-lightbox",
+  "homepage": "https://github.com/nasskalt/bs5-lightbox",
   "keywords": [
     "lightbox",
     "gallery",
@@ -24,7 +24,7 @@
   "jsdelivr": "dist/index.bundle.min.js",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/trvswgnr/bs5-lightbox.git"
+    "url": "git+https://github.com/nasskalt/bs5-lightbox.git"
   },
   "peerDependencies": {
     "bootstrap": "^5.0.0"
